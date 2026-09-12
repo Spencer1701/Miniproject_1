@@ -430,8 +430,9 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_unknown_led_and_duplicate_pins_are_rejected(self):
         with patch.object(config, "WIRING_CONFIRMED", True):
-            with self.assertRaisesRegex(ValueError, "RGB_COMMON_ANODE"):
-                config.validate()
+            with patch.object(config, "RGB_COMMON_ANODE", None):
+                with self.assertRaisesRegex(ValueError, "RGB_COMMON_ANODE"):
+                    config.validate()
             with patch.object(config, "RGB_COMMON_ANODE", False):
                 config.validate()
                 with patch.object(config, "SET_GPIO", config.RUN_GPIO):

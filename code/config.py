@@ -7,8 +7,9 @@ table needs corrections; the actual assembled circuit has not been verified.
 
 # Set True only after checking the pin map, driver supply, and enable wiring.
 WIRING_CONFIRMED = False
-# TODO: identify the LED. False = common cathode to GND; True = anode to 3V3.
-RGB_COMMON_ANODE = None
+# Active-high RGB operation confirmed by the team's two-cycle bench test.
+# False = common cathode to GND; True = common anode to 3V3.
+RGB_COMMON_ANODE = False
 
 # L293D inputs 1A/2A/3A/4A: pins 2/7/10/15; XIAO D0/D1/D2/D3.
 # Output wires respectively: orange/pink/yellow/blue; motor red common to 5V.
@@ -22,7 +23,8 @@ MOTOR_ACTIVE_LEVEL = 0  # Common at +5V: the selected output must sink current.
 MOTOR_ENABLE_GPIO = 44
 SET_GPIO = 5  # D4, normally-open switch to GND; internal pull-up.
 RUN_GPIO = 6  # D5, normally-open switch to GND; also the light-sleep wake pin.
-RGB_GPIOS = (7, 9, 8)  # R/G/B = D8/D10/D9, each through its own 220-ohm resistor.
+# Bench test: GPIO7 lit blue, GPIO9 green, and GPIO8 red.
+RGB_GPIOS = (8, 9, 7)  # R/G/B = D9/D10/D8, each through its own 220-ohm resistor.
 
 PRESET_MINUTES = (15, 20, 25, 30)
 DIAL_MINUTES = 30  # Matches the printed face: 0/30 at the top, 15 at the bottom.

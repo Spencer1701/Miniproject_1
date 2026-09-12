@@ -1,8 +1,9 @@
 # Meeting timer firmware
 
-Status: MicroPython implementation with desktop regression tests. **TODO: verify
-the assembled wiring and run on the real XIAO/motor.** No hardware test, timing
-accuracy measurement, or power measurement has been completed by this code change.
+Status: MicroPython implementation with desktop regression tests. The team has
+reported successful button press/release events and two RGB colour cycles on
+the real board. **TODO: verify the motor-driver wiring and run the complete
+timer.** Motor operation, timing accuracy, and power consumption are untested.
 The existing empty README files and course template are preserved.
 
 ## What the course requires
@@ -42,9 +43,9 @@ This implementation expects the following concrete wiring:
 | Driver enable | D7 | 44 | BOTH L293D pins 1 and 9; remove the supply jumper |
 | SET | D4 | 5 | One switch pin here, the other to GND |
 | RUN | D5 | 6 | One switch pin here, the other to GND |
-| LED red | D8 | 7 | Red channel through its own 220-ohm resistor |
+| LED red | D9 | 8 | Red channel through its own 220-ohm resistor |
 | LED green | D10 | 9 | Green channel through its own 220-ohm resistor |
-| LED blue | D9 | 8 | Blue channel through its own 220-ohm resistor |
+| LED blue | D8 | 7 | Blue channel through its own 220-ohm resistor |
 
 - L293D **pin 16 (VCC1) and pin 8 (VCC2) go to 5V**, not 3V3. TI specifies
   a minimum 4.5 V logic supply. The XIAO's 3.3 V control signals satisfy the
@@ -71,16 +72,20 @@ This implementation expects the following concrete wiring:
   and each colour using its datasheet or a diode test; do not infer the pinout
   just from a four-lead package. Each colour needs its own resistor.
 
-**TODO:** verify these connections against the real circuit/photos. The default
-`WIRING_CONFIRMED=False` and `RGB_COMMON_ANODE=None` deliberately prevent GPIO
-initialisation until the configuration has been checked. These are commissioning
-settings, not missing timer logic. Do not enable them merely to silence an error.
+The team's RGB test identified GPIO7 as blue, GPIO9 as green, and GPIO8 as red
+using active-high PWM. The configuration therefore uses `RGB_GPIOS=(8, 9, 7)`
+in red/green/blue order and `RGB_COMMON_ANODE=False`.
+
+**TODO:** verify the remaining connections, particularly the driver supply and
+enable pins. `WIRING_CONFIRMED=False` still prevents GPIO initialisation until
+those checks are complete. Do not enable it merely to silence an error.
 
 ## Upload using Thonny
 
 1. Keep the already-flashed MicroPython firmware. Choose the ESP32 interpreter
    and the XIAO's USB port in Thonny.
-2. Check the circuit above. Set the two commissioning values in `code/config.py`.
+2. Check the circuit above, then set `WIRING_CONFIRMED=True` in `code/config.py`.
+   The RGB mapping/polarity already match the team's test; recheck if rewired.
    Keep the required preset values unchanged. Initially set
    `LIGHT_SLEEP_ENABLED=False` if you want continuous USB/Thonny access.
 3. Copy **all four files** from `code/` to the **root of the MicroPython device**:
@@ -194,9 +199,20 @@ modules compiled with MicroPython `mpy-cross` v1.29.0; Ruff syntax, unused-name
 and import-order checks passed. Cross-compilation checks language compatibility,
 not the board's pin wiring, peripheral availability or physical behaviour.
 
+Bench observations reported by the team on 2026-09-11:
+
+- SET (D4/GPIO5) and RUN (D5/GPIO6) each registered a press and release after
+  initially reading released. Physical left/right assignment depends on which
+  button was pressed first; it was not independently observed.
+- The RGB diagnostic drove GPIO7, GPIO9, then GPIO8 with active-high PWM. The
+  team observed blue, green, then red, repeated twice. The application pin map
+  has been corrected accordingly. Smooth fading and the application's
+  one-second pulse have not yet been explicitly confirmed.
+
 **TODO — bench acceptance:**
 
-- Confirm LED polarity/colour mapping and a one-second brightness pulse.
+- Confirm smooth fading, corrected red/green/blue order, and the application's
+  one-second brightness pulse.
 - Check positive/negative motor jogs, enable-off behaviour and no missed steps.
 - Measure a complete output revolution. The nominal **2048 wave/full steps**
   differs from a 4096 half-step setting; gearbox variants may need calibration.
