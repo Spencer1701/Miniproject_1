@@ -25,9 +25,7 @@ Documents changes made to `Mini-project.kicad_sch` after the initial (v1) versio
 - Added net labels (GPIO, SET, RUN, U1, U2 , J1 etc) for schematic readability.
 
 ## Still open
-- Confirm actual enable-rail voltage (5V vs 3.3V).
 - Noted 0.1µF bypass capacitors at VCC1/VCC2 as **proposed, not yet installed** — pending physical confirmation, per TI's datasheet guidance (p.13) and `wiring-reference.md`'s TODO.
-- Confirm actual fitted resistor values against the 220Ω nominal.
 
 
 
