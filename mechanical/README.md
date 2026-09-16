@@ -1,5 +1,6 @@
 # Mechanical
 
-Optional enclosure prototypes are in [stl/](stl/). This team has no mechanical
-engineering members, so an enclosure is not required; a clock hand is still
-required. The prototype enclosure fit has not been physically verified.
+The team printed the compact [clock face and hand set](stl/mini_clock_face_and_hands.stl).
+It contains a square 30-minute dial, LED opening, and three alternative hand
+fits; install one hand. See [printing notes](stl/README.md).
+Earlier enclosure prototypes remain optional.

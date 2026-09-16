@@ -8,4 +8,8 @@ An enclosure is optional for this team, which has no mechanical engineering memb
 Use [code/meeting_timer.py](code/meeting_timer.py). See the
 [operating instructions](docs/operating-instructions.md),
 [state chart](docs/state-chart.md), and [references](docs/references.md).
-Current verification and remaining submission items are in [firmware notes](docs/firmware.md).
+The printed compact clock face and hand set is in
+[mechanical/stl/mini_clock_face_and_hands.stl](mechanical/stl/mini_clock_face_and_hands.stl).
+See the [KiCad schematic](electrical/schematic/README.md) and
+[wiring photo](wiring/wiring.jpg). Current verification and remaining submission
+items are in [firmware notes](docs/firmware.md).

@@ -1,4 +1,4 @@
-"""Standalone MicroPython integration test for the team's current breadboard.
+"""Standalone MicroPython meeting timer for the team's final breadboard.
 
 Open this one file in Thonny and press F5. No supporting files need uploading.
 QUICK_TEST=True uses 30/40/50/60 SECOND runs for the 15/20/25/30 preset labels.
@@ -10,8 +10,8 @@ Hold RUN for 1.5 seconds to accept the current position as 0/30. Wait about
 start; tap again to pause/resume. SET cycles presets while selecting. Hold
 RUN to cancel/reset or hold SET to recalibrate. Short actions occur on release.
 
-Green pulses during the first part of a run, then red for the last third of
-the 15-minute preset (last 10 seconds in quick mode). Blue indicates selection
+Green pulses while more than five minutes remain, then red for the final five
+minutes of every preset (last 10 seconds in quick mode). Blue indicates selection
 or pause. Both buttons held together are ignored until both are released.
 
 Current wiring: motor D0-D3/GPIO1-4, SET D4/GPIO5, RUN D5/GPIO6; RGB red GPIO8,
@@ -26,6 +26,7 @@ team's observed phase order/speed. Position is estimated; no encoder is fitted.
 """
 
 QUICK_TEST = False  # Explicit accelerated test; False selects real-minute timing.
+FIRMWARE_REVISION = "2026-09-15-direction-fix"
 
 class BenchSettings:
     """Hardware and timing configuration for the XIAO ESP32-S3 meeting timer.
@@ -53,7 +54,7 @@ class BenchSettings:
     MOTOR_ENABLE_GPIO = None
     SET_GPIO = 5  # D4, normally-open switch to GND; internal pull-up.
     RUN_GPIO = 6  # D5, normally-open switch to GND; also the light-sleep wake pin.
-    # Bench test: GPIO7 lit blue, GPIO9 green, and GPIO8 red.
+    # Final pin check: GPIO7 blue, GPIO8 red, GPIO9 green; no channel swap.
     RGB_GPIOS = (8, 9, 7)  # R/G/B = D9/D10/D8, each through its own 220-ohm resistor.
 
     PRESET_MINUTES = (15, 20, 25, 30)
@@ -63,7 +64,10 @@ class BenchSettings:
     # Nominal full/wave steps, NOT the 4096 half-step convention.
     # TODO: measure an output revolution and adjust for your motor's gear ratio.
     STEPS_PER_REVOLUTION = 2048
-    MOTOR_DIRECTION = 1  # Change to -1 if a positive jog goes counterclockwise.
+    # Reverse the original phase direction for the team's front-facing dial.
+    # Positive logical motion follows increasing marks clockwise; the countdown
+    # moves counterclockwise. Re-zero the hand after changing this setting.
+    MOTOR_DIRECTION = -1
     STEP_INTERVAL_MS = 25  # Conservative starting rate; no blocking motor loops.
     COIL_SETTLE_MS = 100  # Dwell before removing phase commands; fixed enables remain active.
     CALIBRATION_JOG_STEPS = 8
@@ -365,22 +369,37 @@ class MeetingTimer:
         return rounded % self.steps_per_rev
 
 
+def indicator_color(timer, warning_ms):
+    """Return the commanded color, independent of the PWM fade's brightness.
+
+    This is also reported in Thonny to distinguish time/dial errors from a
+    swapped LED connection. It describes the command, not a sensor reading.
+    """
+    if timer.state == CALIBRATING:
+        return "purple"
+    if timer.state in (SELECTING, PAUSED):
+        return "blue"
+    if timer.state == FINISHED or timer.remaining_ms <= warning_ms:
+        return "red"
+    return "green"
+
+
 def indicator(timer, period_ms, max_duty, warning_ms):
     """Return logical R/G/B 16-bit brightness; driver handles LED polarity."""
     age = timer.state_elapsed_ms
     phase = age % period_ms
     duty = max_duty * (period_ms - abs(2 * phase - period_ms)) // period_ms
-    if timer.state == CALIBRATING:
-        return duty, 0, duty  # Purple identifies the uncalibrated state.
     if timer.state == SELECTING:
         # 1/2/3/4 blue pulses identify 15/20/25/30, followed by a two-second gap.
         pulses = timer.selected + 1
         if age % ((pulses + 2) * period_ms) >= pulses * period_ms:
             duty = 0
+    color = indicator_color(timer, warning_ms)
+    if color == "purple":
+        return duty, 0, duty
+    if color == "blue":
         return 0, 0, duty
-    if timer.state == PAUSED:
-        return 0, 0, duty
-    if timer.state == FINISHED or timer.remaining_ms <= warning_ms:
+    if color == "red":
         return duty, 0, 0
     return 0, duty, 0
 
@@ -585,6 +604,10 @@ def run():
             import esp32
 
             esp32.wake_on_ext0(pin=run_pin, level=esp32.WAKEUP_ALL_LOW)
+        print("Firmware:", FIRMWARE_REVISION)
+        print("Motor direction:", config.MOTOR_DIRECTION,
+              "; red warning at:", config.WARNING_REMAINING_MS // 1000,
+              "seconds remaining; RGB GPIOs:", config.RGB_GPIOS)
         if config.MINUTE_MS != 60000:
             print("QUICK BENCH TEST: 15/20/25/30 presets run for 30/40/50/60 seconds.")
         else:
@@ -609,7 +632,9 @@ def run():
             if time.ticks_diff(now, last_status) >= 5000:
                 print("Status:", app.timer.state, "remaining:",
                       (app.timer.remaining_ms + 999) // 1000, "s; hand:",
-                      "ready" if motor.is_settled() else "moving")
+                      "ready" if motor.is_settled() else "moving",
+                      "; LED command:",
+                      indicator_color(app.timer, config.WARNING_REMAINING_MS))
                 last_status = now
             if app.can_sleep(now):
                 motor.release()

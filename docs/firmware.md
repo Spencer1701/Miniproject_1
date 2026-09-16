@@ -2,9 +2,8 @@
 
 The working program is **[code/meeting_timer.py](../code/meeting_timer.py)**.
 It is a standalone MicroPython file for the current XIAO ESP32-S3 breadboard.
-Save that program as `main.py` on the device for startup. The separate
-`config.py`, `logic.py`, `hardware.py`, and repository `main.py` are retained
-from the earlier modular implementation and are not dependencies of this file.
+Save that program as `main.py` on the device for startup. It needs no supporting
+Python files. The superseded modular implementation is preserved in Git history.
 
 Read the [operating instructions](operating-instructions.md),
 [state chart](state-chart.md), [wiring reference](../electrical/wiring-reference.md),
@@ -18,6 +17,7 @@ and [sources](references.md) alongside these notes.
 | Dial | Fixed 30-minute revolution; nominal 2048 wave steps per revolution |
 | Motor GPIOs | `(1, 2, 3, 4)` = XIAO D0-D3 |
 | Phase order | `(0, 2, 1, 3)` = test sequence A; selected phase LOW |
+| Motor direction | `-1`: reversed for the mounted dial; physical recheck pending |
 | Motor step interval | At least 25 ms while positioning; no catch-up bursts |
 | Final phase dwell | 100 ms before removing the active phase command |
 | Driver enables | Fixed HIGH; `MOTOR_ENABLE_GPIO = None`; D7 unused |
@@ -54,19 +54,40 @@ shaft position or proof that no steps were missed.
 | Thonny inspection | `QUICK_TEST = False` visible; running status decreased 438 → 433 → 428 seconds; no error visible in that inspected log |
 | Prior software checks | 31 modular regression tests and four additional local standalone checks passed; standalone MicroPython cross-compilation passed |
 
-The local standalone checks covered duration selection, runtime cleanup, and
-accelerated preset/pause/expiry behavior using fake hardware. They are not
-physical timing measurements. The committed `tests/test_firmware.py` exercises
-the retained modular version, not the standalone entry point; run those tests
-from the repository root with `python3 -m unittest discover -s tests -v`.
+The earlier local standalone checks covered duration selection, runtime cleanup,
+and accelerated preset/pause/expiry behavior using fake hardware. The repository
+now also includes `tests/test_meeting_timer.py` for the standalone entry point:
+direction commands for the 20-minute dial position/countdown, all real preset
+durations, the exact five-minute LED boundary, state colors, and runtime cleanup.
+These are software checks, not physical timing measurements.
 
-**TODO: add standalone regression coverage to the repository.** Documentation
-updates do not constitute a new hardware test. No complete real-duration timing
-measurement, calibrated angular error, or measured power result is recorded.
+Both `tests/test_firmware.py` and `tests/test_meeting_timer.py` now exercise the
+final standalone program. All 37 desktop tests passed during final preparation;
+MicroPython cross-compilation also passed. Run the suite from the repository
+root with `python3 -m unittest discover -s tests -v`.
+No complete real-duration timing measurement, calibrated angular error, or
+measured power result is recorded.
+
+## Mounted dial correction (2026-09-15)
+
+The team reported that selecting 20 minutes put the hand at 10 and the hand
+counted clockwise. The standalone program now reverses `MOTOR_DIRECTION` to
+`-1`, preserving the phase order and elapsed-time countdown. **TODO: run this
+revision, establish zero again, and verify 20 positions at 20 and counts
+counterclockwise toward zero on the physical dial.**
+
+The team also reported red immediately after starting, including above five
+minutes remaining. Software still commands green above five minutes and red
+at or below five. Thonny now prints the firmware revision and `LED command`
+alongside the remaining seconds. The final pin check was reported as
+**GPIO7 blue, GPIO8 red, GPIO9 green**. The team suspected touching resistor
+leads caused the earlier anomalous colors; that cause was not independently
+measured. The original RGB order `(8, 9, 7)` and five-minute threshold remain
+unchanged. **TODO: confirm the full countdown after separating the leads.**
 
 ## Remaining acceptance and submission items
 
-- **TODO:** attach the clock hand and confirm its marks, rotation direction,
+- **TODO:** confirm the mounted hand's marks, rotation direction,
   clearance, and return to zero. A popsicle stick is allowed; this team has no
   MechEs, so enclosure CAD and printing are optional.
 - **TODO:** record final checks for all presets, pause/resume, cancel, expiry,
@@ -76,17 +97,19 @@ measurement, calibrated angular error, or measured power result is recorded.
 - **TODO:** demonstrate and document the handout's low-power outcome. Radios
   are off, but current has not been measured, driver enables remain HIGH, and
   light sleep is disabled. Do not report demonstrated coil-off sleep.
-- **TODO:** finish the schematic PDF/editable source in
-  [electrical/schematic/](../electrical/schematic/) after tracing the noted
-  unknowns; the wiring table is not the finished schematic.
-- **TODO:** add completed-device photos to [media/photos/](../media/photos/),
+- The team has supplied the [schematic PDF and KiCad source](../electrical/schematic/README.md).
+  **TODO:** complete any physical trace checks still noted in the wiring reference
+  and schematic changelog; file availability is not a new circuit verification.
+- A [wiring photo](../wiring/wiring.jpg) is available. **TODO:** add a final
+  assembled-device photo with the printed face and hand to [media/photos/](../media/photos/),
   and a shareable link in [media/README.md](../media/README.md) to a demo shorter
   than 10 seconds stored in the team Google Drive `/video` folder.
 - **TODO:** confirm the team task board, each member's contributions and
   demonstration of uploading final code from their own laptop, both individual
   and team Blackboard repo-link submissions, and the next IDR demonstration.
 
-The team has not adopted the optional prototype housing for submission.
-Existing STL files remain available as optional design work; their physical
-fit has not been tested. Project requirements and technical sources are listed
+The selected print job is the [compact clock face and three hand fits](../mechanical/stl/mini_clock_face_and_hands.stl).
+The team reports printing that design; the selected hand fit, actual slicer
+settings, and measured print time have not been recorded. The earlier full
+enclosure STL files remain optional prototypes with unverified fit. Project requirements and technical sources are listed
 in [references](references.md).

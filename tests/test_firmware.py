@@ -1,4 +1,4 @@
-"""Desktop regression tests; fake GPIOs cannot establish real hardware fit.
+"""Regression tests for the final standalone firmware; GPIOs and time are simulated.
 
 Run from the repository root: python3 -m unittest discover -s tests -v
 The fake clock wraps deliberately so long meetings exercise wrap-safe timing.
@@ -12,9 +12,8 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "code"))
-import config
-from hardware import RgbLed, WaveStepper
-from logic import (
+from meeting_timer import config, RgbLed, WaveStepper
+from meeting_timer import (
     CALIBRATING,
     FINISHED,
     LONG,
@@ -26,7 +25,7 @@ from logic import (
     MeetingTimer,
     indicator,
 )
-from main import TimerApplication
+from meeting_timer import TimerApplication
 
 TICK_PERIOD = 1 << 20
 
@@ -70,7 +69,7 @@ class Rig:
         self.now = 0
         self.set_pin, self.run_pin = Pin(), Pin()
         self.coils = [Pin() for _ in range(4)]
-        self.enable = Pin(0)
+        self.enable = Pin(0) if self.cfg.MOTOR_ENABLE_GPIO is not None else None
         self.motor = WaveStepper(
             self.coils,
             self.enable,
@@ -95,7 +94,7 @@ class Rig:
             self.now,
         )
 
-    def advance(self, duration, quantum=10):
+    def advance(self, duration, quantum=5):
         while duration:
             elapsed = min(duration, quantum)
             self.now = (self.now + elapsed) % TICK_PERIOD
@@ -111,7 +110,7 @@ class Rig:
     def ready(self):
         self.advance(50)
         self.press(self.run_pin, self.cfg.LONG_PRESS_MS + 80)
-        self.advance(12000)
+        self.advance(28000)
         assert self.app.timer.state == SELECTING and self.motor.is_settled()
 
 
@@ -246,33 +245,33 @@ class MotorTests(unittest.TestCase):
         observations = []
 
         def observe():
-            if rig.enable.value():
-                selected = [i for i, pin in enumerate(rig.coils) if pin.value() == 0]
-                self.assertEqual(len(selected), 1)
-                observations.append(selected[0])
+            selected = [i for i, pin in enumerate(rig.coils) if pin.value() == 0]
+            self.assertLessEqual(len(selected), 1)
 
-        for pin in rig.coils + [rig.enable]:
+        for pin in rig.coils:
             pin.changed = observe
         rig.motor.set_target(4)
-        for now in (10, 20, 30, 40):
+        for now in (25, 50, 75, 100):
             rig.motor.update(now)
-        self.assertEqual(observations, [2, 1, 3, 0])
-        rig.motor.update(70)
-        self.assertFalse(rig.enable.value())
+            observations.append(next(i for i, pin in enumerate(rig.coils) if pin.value() == 0))
+        self.assertEqual(observations, [3, 1, 2, 0])
+        rig.motor.update(200)
+        self.assertTrue(all(pin.value() == 1 for pin in rig.coils))
         self.assertTrue(rig.motor.is_settled())
 
     def test_reverse_wrap_uses_one_step_not_full_revolution(self):
         rig = Rig()
         rig.motor.set_target(2047)
-        rig.motor.update(10)
+        rig.motor.update(25)
         self.assertEqual(rig.motor.position, 2047)
-        self.assertEqual(rig.motor.phase, 3)
+        self.assertEqual(rig.motor.phase, 1)
 
     def test_direction_setting_reverses_phases_not_logical_angle(self):
-        rig = Rig(MOTOR_DIRECTION=-1)
-        rig.motor.set_target(1)
-        rig.motor.update(10)
-        self.assertEqual((rig.motor.phase, rig.motor.position), (3, 1))
+        for direction, phase in ((-1, 3), (1, 1)):
+            rig = Rig(MOTOR_DIRECTION=direction)
+            rig.motor.set_target(1)
+            rig.motor.update(25)
+            self.assertEqual((rig.motor.phase, rig.motor.position), (phase, 1))
 
     def test_late_service_never_creates_a_burst_of_steps(self):
         rig = Rig()
@@ -285,18 +284,20 @@ class MotorTests(unittest.TestCase):
         rig = Rig()
         rig.motor.last_step_at = TICK_PERIOD - 10
         rig.motor.set_target(1)
-        rig.motor.update(0)
+        rig.motor.update(14)
+        self.assertEqual(rig.motor.position, 0)
+        rig.motor.update(15)
         self.assertEqual(rig.motor.position, 1)
-        rig.motor.update(29)
+        rig.motor.update(114)
         self.assertTrue(rig.motor.energized)
-        rig.motor.update(30)
+        rig.motor.update(115)
         self.assertFalse(rig.motor.energized)
 
     def test_zero_cannot_be_marked_during_motion(self):
         rig = Rig()
         with self.assertRaises(ValueError):
             rig.motor.mark_zero()
-        rig.motor.update(30)
+        rig.motor.update(100)
         rig.motor.mark_zero()
 
 
@@ -342,14 +343,14 @@ class ApplicationTests(unittest.TestCase):
         rig.advance(50)
         self.assertEqual(rig.app.timer.state, CALIBRATING)
         rig.press(rig.set_pin)
-        rig.advance(100)
+        rig.advance(300)
         self.assertEqual(rig.motor.position, 8)
         rig.press(rig.run_pin)
-        rig.advance(100)
+        rig.advance(300)
         self.assertEqual(rig.motor.position, 0)
         rig.press(rig.run_pin, 1580)
         self.assertEqual(rig.app.timer.state, SELECTING)
-        rig.advance(12000)
+        rig.advance(28000)
         self.assertEqual(rig.motor.position, 1024)
         self.assertEqual(rig.app.timer.remaining_ms, 900000)
 
@@ -357,7 +358,7 @@ class ApplicationTests(unittest.TestCase):
         rig = Rig()
         rig.ready()
         rig.press(rig.set_pin)
-        rig.advance(5000)
+        rig.advance(10000)
         self.assertEqual(rig.app.timer.remaining_ms, 1200000)
         rig.press(rig.run_pin)
         self.assertEqual(rig.app.timer.state, RUNNING)
@@ -386,7 +387,7 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual((rig.app.timer.state, rig.app.timer.selected), (SELECTING, 0))
 
     def test_low_power_excludes_active_paused_and_calibration_states(self):
-        rig = Rig(IDLE_SLEEP_MS=1000)
+        rig = Rig(IDLE_SLEEP_MS=1000, LIGHT_SLEEP_ENABLED=True, MOTOR_ENABLE_GPIO=44)
         rig.advance(2000)
         self.assertFalse(rig.app.can_sleep(rig.now))
         rig.ready()
@@ -409,7 +410,7 @@ class ApplicationTests(unittest.TestCase):
         rig.advance(100)
         self.assertEqual(rig.app.timer.state, SELECTING)
         rig.press(rig.set_pin)
-        rig.advance(5000)
+        rig.advance(10000)
         self.assertTrue(rig.motor.is_settled())
         self.assertEqual(rig.motor.position, 1365)
 
@@ -424,9 +425,11 @@ class ApplicationTests(unittest.TestCase):
 
 
 class ConfigurationTests(unittest.TestCase):
-    def test_default_configuration_inhibits_unverified_hardware(self):
-        with self.assertRaisesRegex(ValueError, "WIRING_CONFIRMED"):
-            config.validate()
+    def test_commissioning_guard_can_inhibit_hardware(self):
+        config.validate()
+        with patch.object(config, "WIRING_CONFIRMED", False):
+            with self.assertRaisesRegex(ValueError, "WIRING_CONFIRMED"):
+                config.validate()
 
     def test_unknown_led_and_duplicate_pins_are_rejected(self):
         with patch.object(config, "WIRING_CONFIRMED", True):
@@ -486,7 +489,7 @@ class RuntimeTests(unittest.TestCase):
         return modules, created_pins, created_pwm
 
     def test_ctrl_c_releases_motor_and_closes_pwm_for_both_led_polarities(self):
-        entry = importlib.import_module("main")
+        entry = importlib.import_module("meeting_timer")
         for anode in (False, True):
             modules, pins, pwms = self.make_runtime()
             with (
@@ -501,7 +504,8 @@ class RuntimeTests(unittest.TestCase):
             ):
                 with self.assertRaises(KeyboardInterrupt):
                     entry.run()
-            self.assertEqual(pins[config.MOTOR_ENABLE_GPIO].value(), 0)
+            self.assertNotIn(44, pins)
+            self.assertTrue(all(pins[p].value() == 1 for p in config.MOTOR_GPIOS))
             self.assertEqual(len(pwms), 3)
             self.assertTrue(all(pwm.closed for pwm in pwms))
             self.assertTrue(
@@ -509,7 +513,7 @@ class RuntimeTests(unittest.TestCase):
             )
 
     def test_partial_initialization_failure_disables_motor_and_existing_pwm(self):
-        entry = importlib.import_module("main")
+        entry = importlib.import_module("meeting_timer")
         modules, pins, pwms = self.make_runtime(fail_pwm=1)
         with (
             patch.dict(sys.modules, modules),
@@ -522,14 +526,15 @@ class RuntimeTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(OSError, "Injected PWM"):
                 entry.run()
-        self.assertEqual(pins[config.MOTOR_ENABLE_GPIO].value(), 0)
+        self.assertNotIn(44, pins)
+        self.assertTrue(all(pins[p].value() == 1 for p in config.MOTOR_GPIOS))
         self.assertEqual(len(pwms), 1)
         self.assertTrue(pwms[0].closed)
 
     def test_commissioning_guard_runs_before_any_gpio_initialization(self):
-        entry = importlib.import_module("main")
+        entry = importlib.import_module("meeting_timer")
         modules, pins, pwms = self.make_runtime()
-        with patch.dict(sys.modules, modules):
+        with patch.dict(sys.modules, modules), patch.object(config, "WIRING_CONFIRMED", False):
             with self.assertRaisesRegex(ValueError, "WIRING_CONFIRMED"):
                 entry.run()
         self.assertFalse(pins)

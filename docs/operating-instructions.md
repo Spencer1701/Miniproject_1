@@ -2,9 +2,9 @@
 
 The meeting timer offers 15, 20, 25, and 30 minute presets. A motor-driven hand
 shows the remaining time, and an RGB LED indicates the operating state. It
-uses USB power and operates with two buttons. An enclosure is not needed;
-attach a lightweight hand, such as the supplied popsicle stick, and provide a
-clear 0/30 reference mark.
+uses USB power and operates with two buttons. The printed compact face has a
+0/30 mark at the top and clockwise-increasing minute labels. Install one of
+the printed hand fits on the motor; a full enclosure is not needed.
 
 ## Identify the buttons
 
@@ -36,7 +36,24 @@ A hold lasts about **1.5 seconds**. Long presses do not also count as taps.
 The scale represents 30 minutes per full revolution, so 15 minutes is opposite
 zero. The 30-minute and zero positions share the same angle; use the LED state
 to distinguish selecting/running from finished. The hand moves from the preset
-toward zero. Check that any hand/dial markings agree with its actual direction.
+counterclockwise toward zero with the final motor-direction setting. Establish
+zero again after changing motor direction or repositioning the hand.
+
+## Preset press counts
+
+The current program offers **15, 20, 25, and 30 minutes; there is no 10-minute preset**.
+After a fresh power-up and zero calibration, 15 minutes is already selected:
+
+| Duration | Additional SET taps from the initial 15-minute selection | Blue pulses per group | Start |
+| --- | --- | --- | --- |
+| 15 minutes | 0 | 1 | Tap RUN once after the hand stops |
+| 20 minutes | 1 | 2 | Tap RUN once after the hand stops |
+| 25 minutes | 2 | 3 | Tap RUN once after the hand stops |
+| 30 minutes | 3 | 4 | Tap RUN once after the hand stops |
+
+Each SET tap advances one preset, wrapping from 30 back to 15. After canceling
+or recalibrating during use, the current preset is retained; count the blue
+pulses to identify it rather than assuming it has returned to 15 minutes.
 
 ## Pause, cancel, or start another meeting
 
@@ -78,9 +95,6 @@ open that file and press **F5**. It needs no additional project Python files
 on the board. To run at power-up, save this program to the MicroPython device's
 filesystem root under the name **main.py**, then reset the board. This uses
 MicroPython's [startup script behavior](https://docs.micropython.org/en/latest/reference/reset_boot.html).
-
-The repository's `code/main.py` belongs to the earlier modular implementation;
-the program to install for this build is `code/meeting_timer.py`.
 
 Keep `QUICK_TEST = False` for real 15/20/25/30-minute operation. Setting it to
 `True` is an explicitly accelerated test: those four labels instead run for

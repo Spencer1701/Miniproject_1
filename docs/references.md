@@ -1,8 +1,8 @@
 # References and design sources
 
 This list distinguishes assignment requirements, manufacturer/API references,
-and observations from the team's own build. Documentation was reviewed against
-`code/meeting_timer.py` in commit `376af36` on 2026-09-13.
+and observations from the team's own build. The final implementation is `code/meeting_timer.py`; the code and print-file
+references were updated on 2026-09-15.
 
 ## Course requirements
 

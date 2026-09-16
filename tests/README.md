@@ -1,6 +1,6 @@
 # Tests
 
-`test_firmware.py` covers the retained modular firmware, not the standalone
-`meeting_timer.py`. Run it from the repository root with
-`python3 -m unittest discover -s tests -v`; hardware observations and remaining
-checks are recorded in [firmware notes](../docs/firmware.md).
+Both test files exercise the final standalone `code/meeting_timer.py` using fake
+GPIOs and a simulated clock. Run from the repository root:
+`python3 -m unittest discover -s tests -v`.
+Physical observations and remaining checks are in the [firmware notes](../docs/firmware.md).

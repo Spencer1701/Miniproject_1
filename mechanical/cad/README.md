@@ -1,4 +1,5 @@
 # CAD
 
-Reserved for editable mechanical design files if the team chooses to use an
-enclosure. No housing is planned for the current submission.
+The final compact design is supplied as an [STL](../stl/mini_clock_face_and_hands.stl).
+TODO: add an editable, reproducible compact CAD source if further design changes
+are needed. The earlier full enclosure is optional.
